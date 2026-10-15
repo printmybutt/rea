@@ -398,8 +398,9 @@ running server or its registration.
 The npm release checked on **2026-10-11** was **6.4.0**, published from
 [`a56f7bb6`](https://github.com/morluto/rea/commit/a56f7bb668ab23fec8d33f7af353ac7ed2fe1895).
 The actual registry package accepted dry-run setup plans for the 17 client IDs
-in that release, including Qwen Code, Pi and Hermes. DeepSeek Harness (`dsh`)
-is included from 6.5.0 and was absent from the checked npm 6.4.0 package.
+in that release, including Qwen Code, Pi and Hermes. Seven client IDs are
+included from 6.5.0 and were absent from the checked npm 6.4.0 package: `droid`,
+`dsh`, `kimi`, `qoder`, `trae`, `workbuddy` and `zcode`.
 The 6.4.0 registry check does not establish 6.5.0 publication or live DeepSeek
 API integration.
 OpenCode's plan selected
@@ -482,8 +483,8 @@ hosted connector; see [its configuration](client-configuration.md#other-client-s
 | ZCode              | `zcode`          |
 | DeepSeek Harness   | `dsh`            |
 
-`dsh`, `kimi`, and `workbuddy` require a release containing them. The registry
-check above does not cover them.
+`droid`, `dsh`, `kimi`, `qoder`, `trae`, `workbuddy`, and `zcode` require
+`rea-agents@6.5.0` or later. The 6.4.0 registry check above does not cover them.
 
 See [client configuration and troubleshooting](client-configuration.md) for
 configuration paths, profiles, trust policies, and schema-limit workarounds.
@@ -541,6 +542,37 @@ search permissions (`0700`) on a directory you own before retrying.
 
 On supported Linux distributions, approved setup verifies Hopper's official
 `.deb`, `.rpm`, or Arch package before invoking the native package manager.
+The official release feed selects the current public demo without a version
+pin. REA verifies the package's detached PGP signature against Hopper's stable
+primary fingerprint `7C2D73BAFAF5B9A710A69DA1A26DF815099B1BCD`, then checks
+that the signed package and installed launcher agree with `main_exe_hash`.
+Rotating signing subkeys remain bound to that primary identity.
+The feed row itself is not PGP-signed; doctor labels its display version as
+`reported_release_version`, separately from the authenticated launcher identity.
+
+The approval plan includes the caller-selected cache location. Approved setup
+retains the signed archive, public key and release metadata under
+`${XDG_CACHE_HOME:-$HOME/.cache}/rea/hopper-releases/<launcher-sha256>`.
+An empty `XDG_CACHE_HOME` uses `$HOME/.cache`. Approved setup can repair a
+damaged caller-owned entry after authenticating a fresh package; the previous
+entry is preserved beside it as `<launcher-sha256>.backup-<id>`. Ordinary doctor
+and launches reject damaged evidence and never repair it implicitly.
+Approved publications of the same canonical cache entry share a process-backed
+lease. Concurrent setup waits without moving another writer's evidence; a
+failed replacement restores the previous directory when possible and reports
+any retained backup path. Unavailable reads or native inspection tools do not
+authorize replacing existing evidence.
+Doctor and launches authenticate this evidence for offline use; an editable
+digest receipt alone cannot authorize a launcher. Verification reuses at most
+eight immutable package proofs per process, keyed by the complete package,
+key, signature, package format and expected launcher digest. Cached file reads
+still check identity and content. Without retained evidence, inspecting an
+existing install requires the matching current official package and network
+access. Successful live inspection can be reused within that process after
+rehashing the launcher; it does not write a persistent cache or claim that a
+previously observed release is still the latest. Older uncached builds require
+an approved update while the feed exposes only its current release.
+
 REA runs the supported demo build on a private Xvfb display and selects Hopper's
 offered demo mode for each analysis session; it does not require the user's
 desktop display. Unattended package-manager access requires
