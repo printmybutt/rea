@@ -2,21 +2,38 @@ name: Auto Sync Upstream
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '17 */6 * * *'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: upstream-sync-main
+  cancel-in-progress: false
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
       - name: Sync Fork
         env:
-          GH_TOKEN: ${{ github.token }}
+          # Fine-grained PAT scoped to this repository, with Contents and
+          # Workflows read/write permissions. GITHUB_TOKEN cannot merge changes
+          # to workflow files from upstream.
+          GH_TOKEN: ${{ secrets.UPSTREAM_SYNC_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
         run: |
-          gh repo sync ${{ github.repository }} \
-            --branch main \
-            --force
+          set -euo pipefail
+
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::error::Set the UPSTREAM_SYNC_TOKEN repository secret to a fine-grained PAT with Contents and Workflows read/write permissions."
+            exit 1
+          fi
+
+          # Merge upstream without force-resetting fork-specific files or commits.
+          gh api --method POST "repos/${REPOSITORY}/merge-upstream" \
+            -f branch=main \
+            --jq '.message'
