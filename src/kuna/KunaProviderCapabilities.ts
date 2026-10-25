@@ -4,7 +4,15 @@ import type {
 } from "../application/AnalysisProvider.js";
 import type { ProviderRejectionCode } from "../contracts/providerSelection.js";
 import { KUNA_PROVIDER_ID } from "./KunaRelease.js";
-import { REGEX_MATCHING_LIMITATION } from "../process/RegexMatcher.js";
+import {
+  DEFAULT_REGEX_MATCHING_DEADLINE,
+  type RegexMatchingDeadline,
+} from "../config/regexMatchingDeadline.js";
+import {
+  DEFAULT_REGEX_WORKER_HEAP_REQUEST,
+  type RegexWorkerHeapRequest,
+} from "../config/regexWorkerHeapRequest.js";
+import { launchRegexMatchingLimitation } from "../process/RegexMatcher.js";
 import { KUNA_FUNCTION_TEXT_BYTES } from "./KunaLimits.js";
 
 /** Static identity; the observed Kuna release is reported in each analysis profile. */
@@ -19,6 +27,8 @@ export const KUNA_OPERATIONS = Object.freeze([
   "list_documents",
   "list_procedures",
   "search_procedures",
+  "list_strings",
+  "search_strings",
   "procedure_address",
   "address_name",
   "procedure_pseudo_code",
@@ -32,6 +42,9 @@ export type KunaOperation = (typeof KUNA_OPERATIONS)[number];
 
 export const KUNA_RELATIONSHIP_LIMITATION =
   "Kuna reports call-kind edges between its discovered function nodes. Jump/data edges are excluded; unresolved indirect calls and targets outside that inventory remain unknown.";
+export const KUNA_STRING_LIMITATION =
+  "Kuna scans its mapped sections or segments for printable runs of at least five characters, including unterminated fragments. Encodings are ASCII, UTF-8 and Latin-range UTF-16LE; other text can remain undiscovered. String scanning skips references; an empty search is not proof of absence.";
+
 export const KUNA_XREF_LIMITATION =
   "Kuna's static reference walk unifies forwarding aliases and omits references internal to that alias class. REA keeps only exact-address incoming edges; an empty result does not prove no reference exists.";
 
@@ -57,10 +70,20 @@ const KUNA_TEXT_CAPACITY_LIMITATION = `Each buffered source facet admits at most
 /** The limitations that apply to one operation's answer, and only those. */
 export const kunaLimitations = (
   operation: KunaOperation,
+  deadline: RegexMatchingDeadline = DEFAULT_REGEX_MATCHING_DEADLINE,
+  heapRequest: RegexWorkerHeapRequest = DEFAULT_REGEX_WORKER_HEAP_REQUEST,
 ): readonly string[] => {
   switch (operation) {
     case "list_documents":
       return [];
+    case "list_strings":
+      return [KUNA_PROVENANCE, KUNA_STRING_LIMITATION];
+    case "search_strings":
+      return [
+        KUNA_PROVENANCE,
+        KUNA_STRING_LIMITATION,
+        launchRegexMatchingLimitation(deadline, heapRequest),
+      ];
     case "list_procedures":
     case "procedure_address":
     case "address_name":
@@ -69,7 +92,7 @@ export const kunaLimitations = (
       return [
         KUNA_PROVENANCE,
         KUNA_ENTRY_LIMITATION,
-        REGEX_MATCHING_LIMITATION,
+        launchRegexMatchingLimitation(deadline, heapRequest),
       ];
     case "procedure_callers":
     case "procedure_callees":
@@ -100,6 +123,8 @@ export const kunaCapabilities = (
         readonly reason: string;
         readonly code: ProviderRejectionCode;
       },
+  deadline: RegexMatchingDeadline = DEFAULT_REGEX_MATCHING_DEADLINE,
+  heapRequest: RegexWorkerHeapRequest = DEFAULT_REGEX_WORKER_HEAP_REQUEST,
 ): readonly CapabilityDescriptor[] =>
   KUNA_OPERATIONS.map((operation) => ({
     provider: KUNA_PROVIDER_IDENTITY,
@@ -123,5 +148,5 @@ export const kunaCapabilities = (
       changesPermissions: false,
       requiresRoot: false,
     },
-    limitations: kunaLimitations(operation),
+    limitations: kunaLimitations(operation, deadline, heapRequest),
   }));
